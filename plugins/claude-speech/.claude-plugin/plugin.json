@@ -1,0 +1,14 @@
+{
+  "name": "claude-speech",
+  "version": "1.0.0",
+  "description": "Text-to-speech for Claude responses using macOS say command",
+  "author": {
+    "name": "Mark Sherwin Gonzales",
+    "email": "hello@markng.me"
+  },
+  "repository": "https://github.com/markng/claude-plugins",
+  "license": "MIT",
+  "keywords": ["speech", "tts", "accessibility", "voice"],
+  "skills": ["./skills/"],
+  "hooks": "./hooks/hooks.json"
+}
