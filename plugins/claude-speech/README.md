@@ -10,47 +10,48 @@ Text-to-speech for Claude Code responses using macOS `say` command.
 
 ## Installation
 
-### Via Marketplace (if published)
+### Step 1: Add the marketplace and install the plugin
 
-```bash
+```
+/plugin marketplace add markng/claude-plugins
 /plugin install claude-speech@markng-plugins
 ```
 
-### Manual Installation
+### Step 2: Set up the hook (required)
 
-1. Copy the hook script to a permanent location:
-   ```bash
-   cp hooks/speak_response.sh ~/.claude/speech/speak_response.sh
-   chmod +x ~/.claude/speech/speak_response.sh
-   ```
+After installing, tell Claude: **"I just installed the speech plugin, help me set it up"**
 
-2. Add the hook to your `.claude/settings.json`:
-   ```json
-   {
-     "hooks": {
-       "Stop": [
-         {
-           "matcher": "",
-           "hooks": [
-             {
-               "type": "command",
-               "command": "~/.claude/speech/speak_response.sh"
-             }
-           ]
-         }
-       ]
-     }
-   }
-   ```
+Claude will add the required Stop hook to your project's `.claude/settings.json`.
 
-3. Install the skill by adding to settings:
-   ```json
-   {
-     "enabledPlugins": {
-       "claude-speech@markng-plugins": true
-     }
-   }
-   ```
+Or manually add this to `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/plugins/cache/markng-plugins/claude-speech/*/hooks/speak_response.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Step 3: Verify requirements
+
+```bash
+# Check jq is installed
+which jq || brew install jq
+
+# Check say is available (macOS only)
+which say
+```
 
 ## Usage
 
