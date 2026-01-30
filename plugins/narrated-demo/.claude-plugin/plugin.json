@@ -1,0 +1,13 @@
+{
+  "name": "narrated-demo",
+  "version": "1.0.0",
+  "description": "Generate narrated demo videos with synchronized audio using ElevenLabs TTS and Playwright browser automation",
+  "author": {
+    "name": "Mark Ng",
+    "url": "https://markng.co.uk"
+  },
+  "repository": "https://github.com/markng/claude-plugins",
+  "license": "MIT",
+  "keywords": ["demo", "video", "narration", "tts", "elevenlabs", "playwright", "screencast"],
+  "skills": ["./skills/"]
+}

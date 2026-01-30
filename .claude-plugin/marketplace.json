@@ -22,6 +22,15 @@
       "author": {
         "name": "Mark Ng"
       }
+    },
+    {
+      "name": "narrated-demo",
+      "source": "./plugins/narrated-demo",
+      "description": "Generate narrated demo videos with synchronized audio using ElevenLabs TTS and Playwright",
+      "version": "1.0.0",
+      "author": {
+        "name": "Mark Ng"
+      }
     }
   ]
 }
