@@ -7,6 +7,10 @@
 # Architecture:
 #   This script (producer) -> writes to ~/.claude-speech/queue/
 #   speech_consumer.sh (consumer) -> processes queue in FIFO order
+#
+# Position tracking:
+#   Tracks last spoken line number per transcript to prevent double-speaking
+#   when the hook fires multiple times (e.g., after text output, then after tool use)
 
 # Check if speech is enabled (file exists or env var set)
 if [ ! -f "$HOME/.claude-speak" ] && [ "$CLAUDE_SPEAK" != "1" ]; then
@@ -18,9 +22,10 @@ SPEECH_DIR="$HOME/.claude-speech"
 QUEUE_DIR="$SPEECH_DIR/queue"
 LOCK_FILE="$SPEECH_DIR/consumer.lock"
 PID_FILE="$SPEECH_DIR/consumer.pid"
+STATE_DIR="$SPEECH_DIR/state"
 CONSUMER_SCRIPT="$(dirname "$0")/speech_consumer.sh"
 
-mkdir -p "$QUEUE_DIR"
+mkdir -p "$QUEUE_DIR" "$STATE_DIR"
 
 # Read the JSON input from stdin
 input=$(cat)
@@ -36,9 +41,26 @@ if [ -z "$transcript_path" ] || [ ! -f "$transcript_path" ]; then
     exit 0
 fi
 
-# Get the last assistant message with actual text content from the JSONL transcript
+# Generate a state file key from the transcript path (hash to avoid path issues)
+state_key=$(echo "$transcript_path" | md5 -q)
+STATE_FILE="$STATE_DIR/${state_key}.lastline"
+
+# Get current line count of transcript
+current_lines=$(wc -l < "$transcript_path" | tr -d ' ')
+
+# Get last spoken line (0 if not set)
+last_spoken_line=$(cat "$STATE_FILE" 2>/dev/null || echo "0")
+
+# Calculate how many new lines to check
+lines_to_check=$((current_lines - last_spoken_line))
+if [ "$lines_to_check" -le 0 ]; then
+    echo "No new lines since last spoken (current=$current_lines, last=$last_spoken_line)" >> /tmp/speak_hook_debug.log
+    exit 0
+fi
+
+# Get the last assistant message with actual text content from NEW lines only
 # Search backwards through assistant entries since the last one may only have tool_use/thinking blocks
-last_message=$(tail -50 "$transcript_path" | grep '"type":"assistant"' | tac | while IFS= read -r line; do
+last_message=$(tail -"$lines_to_check" "$transcript_path" | grep '"type":"assistant"' | tac | while IFS= read -r line; do
     text=$(echo "$line" | jq -r '.message.content[] | select(.type == "text") | .text' 2>/dev/null | head -1)
     if [ -n "$text" ]; then
         echo "$text"
@@ -50,8 +72,13 @@ done)
 echo "Extracted: $last_message" >> /tmp/speak_hook_debug.log
 
 if [ -z "$last_message" ]; then
+    echo "No new text found in last $lines_to_check lines" >> /tmp/speak_hook_debug.log
     exit 0
 fi
+
+# Update state BEFORE queuing to prevent race conditions
+# If another hook fires while we're processing, it will see our updated line count
+echo "$current_lines" > "$STATE_FILE"
 
 # Clean the message for speech
 clean_message="$last_message"
