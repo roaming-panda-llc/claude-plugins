@@ -15,7 +15,9 @@ POLL_INTERVAL=1
 # Config reader - get value from config file or return default
 get_config() {
     local key="$1" default="$2"
-    grep "^${key}=" "$SPEECH_DIR/config" 2>/dev/null | cut -d'=' -f2 || echo "$default"
+    local value
+    value=$(grep "^${key}=" "$SPEECH_DIR/config" 2>/dev/null | cut -d'=' -f2-)
+    echo "${value:-$default}"
 }
 
 # ElevenLabs TTS via curl
@@ -27,7 +29,7 @@ speak_elevenlabs() {
     # Fallback to macOS say if no API key
     [ -z "$ELEVENLABS_API_KEY" ] && { say "$msg"; return; }
 
-    local audio=$(mktemp /tmp/claude-speech-XXXXXX.mp3)
+    local audio="/tmp/claude-speech-$$.mp3"
     if curl -s -X POST "https://api.elevenlabs.io/v1/text-to-speech/${voice_id}" \
         -H "xi-api-key: ${ELEVENLABS_API_KEY}" \
         -H "Content-Type: application/json" \
