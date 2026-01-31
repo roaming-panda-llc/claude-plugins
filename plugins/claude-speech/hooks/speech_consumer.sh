@@ -25,13 +25,14 @@ speak_elevenlabs() {
     local msg="$1"
     local voice_id=$(get_config voice_id "21m00Tcm4TlvDq8ikWAM")
     local model_id=$(get_config model_id "eleven_flash_v2_5")
+    local api_key="${ELEVENLABS_API_KEY:-$(get_config api_key)}"
 
     # Fallback to macOS say if no API key
-    [ -z "$ELEVENLABS_API_KEY" ] && { say "$msg"; return; }
+    [ -z "$api_key" ] && { say "$msg"; return; }
 
     local audio="/tmp/claude-speech-$$.mp3"
     if curl -s -X POST "https://api.elevenlabs.io/v1/text-to-speech/${voice_id}" \
-        -H "xi-api-key: ${ELEVENLABS_API_KEY}" \
+        -H "xi-api-key: ${api_key}" \
         -H "Content-Type: application/json" \
         -d "$(jq -n --arg t "$msg" --arg m "$model_id" '{text:$t,model_id:$m}')" \
         -o "$audio" && [ -s "$audio" ]; then
