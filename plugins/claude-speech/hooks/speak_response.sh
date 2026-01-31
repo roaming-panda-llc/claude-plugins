@@ -36,10 +36,15 @@ if [ -z "$transcript_path" ] || [ ! -f "$transcript_path" ]; then
     exit 0
 fi
 
-# Get the last assistant message from the JSONL transcript
-# Each line is a JSON object, we want the last assistant message
-# The content is an array of objects like {"type": "text", "text": "..."}, extract just the text
-last_message=$(tail -20 "$transcript_path" | grep '"type":"assistant"' | tail -1 | jq -r '.message.content[] | select(.type == "text") | .text' 2>/dev/null | head -1)
+# Get the last assistant message with actual text content from the JSONL transcript
+# Search backwards through assistant entries since the last one may only have tool_use/thinking blocks
+last_message=$(tail -50 "$transcript_path" | grep '"type":"assistant"' | tac | while IFS= read -r line; do
+    text=$(echo "$line" | jq -r '.message.content[] | select(.type == "text") | .text' 2>/dev/null | head -1)
+    if [ -n "$text" ]; then
+        echo "$text"
+        break
+    fi
+done)
 
 # Log extracted message
 echo "Extracted: $last_message" >> /tmp/speak_hook_debug.log
