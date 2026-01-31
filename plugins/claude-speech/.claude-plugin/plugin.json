@@ -1,14 +1,14 @@
 {
   "name": "claude-speech",
-  "version": "1.0.0",
-  "description": "Text-to-speech for Claude responses using macOS say command",
+  "version": "1.1.0",
+  "description": "Text-to-speech for Claude responses using macOS say or ElevenLabs AI voices",
   "author": {
     "name": "Mark Sherwin Gonzales",
     "email": "hello@markng.me"
   },
   "repository": "https://github.com/markng/claude-plugins",
   "license": "MIT",
-  "keywords": ["speech", "tts", "accessibility", "voice"],
+  "keywords": ["speech", "tts", "accessibility", "voice", "elevenlabs"],
   "skills": ["./skills/"],
   "hooks": "./hooks/hooks.json"
 }
