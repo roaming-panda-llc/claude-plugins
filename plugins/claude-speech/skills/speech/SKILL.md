@@ -21,6 +21,28 @@ Also use this skill when:
 
 ## Commands
 
+### Provider Commands
+
+"use elevenlabs" / "switch to elevenlabs":
+```bash
+mkdir -p ~/.claude-speech && echo "provider=elevenlabs" > ~/.claude-speech/config
+```
+
+"use macos voice" / "use system voice":
+```bash
+mkdir -p ~/.claude-speech && echo "provider=macos" > ~/.claude-speech/config
+```
+
+"set elevenlabs voice to [name/id]":
+```bash
+echo "voice_id=VOICE_ID_HERE" >> ~/.claude-speech/config
+```
+
+Common voice IDs:
+- Rachel (default): `21m00Tcm4TlvDq8ikWAM`
+- Adam: `pNInz6obpgDQGcFmaJgB`
+- Domi: `AZnzlk1XvdvUeBnXmlld`
+
 ### Enable Speech
 ```bash
 touch ~/.claude-speak

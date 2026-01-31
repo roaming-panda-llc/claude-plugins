@@ -12,6 +12,44 @@ PID_FILE="$SPEECH_DIR/consumer.pid"
 IDLE_TIMEOUT=30
 POLL_INTERVAL=1
 
+# Config reader - get value from config file or return default
+get_config() {
+    local key="$1" default="$2"
+    grep "^${key}=" "$SPEECH_DIR/config" 2>/dev/null | cut -d'=' -f2 || echo "$default"
+}
+
+# ElevenLabs TTS via curl
+speak_elevenlabs() {
+    local msg="$1"
+    local voice_id=$(get_config voice_id "21m00Tcm4TlvDq8ikWAM")
+    local model_id=$(get_config model_id "eleven_flash_v2_5")
+
+    # Fallback to macOS say if no API key
+    [ -z "$ELEVENLABS_API_KEY" ] && { say "$msg"; return; }
+
+    local audio=$(mktemp /tmp/claude-speech-XXXXXX.mp3)
+    if curl -s -X POST "https://api.elevenlabs.io/v1/text-to-speech/${voice_id}" \
+        -H "xi-api-key: ${ELEVENLABS_API_KEY}" \
+        -H "Content-Type: application/json" \
+        -d "$(jq -n --arg t "$msg" --arg m "$model_id" '{text:$t,model_id:$m}')" \
+        -o "$audio" && [ -s "$audio" ]; then
+        afplay "$audio"
+    else
+        # Fallback to macOS say on API error
+        say "$msg"
+    fi
+    rm -f "$audio"
+}
+
+# Provider dispatch - route to appropriate TTS backend
+speak_message() {
+    local msg="$1"
+    case "$(get_config provider macos)" in
+        elevenlabs) speak_elevenlabs "$msg" ;;
+        *) say "$msg" ;;
+    esac
+}
+
 # Write PID for status checking
 echo $$ > "$PID_FILE"
 
@@ -65,7 +103,7 @@ main() {
 
                 # Speak the message (blocking)
                 if [ -n "$message" ]; then
-                    say "$message"
+                    speak_message "$message"
                 fi
 
                 # Delete the processed file
