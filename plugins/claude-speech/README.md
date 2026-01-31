@@ -6,7 +6,8 @@ Text-to-speech for Claude Code responses using macOS `say` command.
 
 - Toggle speech on/off via natural language ("turn on speech", "stop talking")
 - Uses macOS built-in text-to-speech
-- Non-blocking: speech runs in background
+- Queue-based architecture prevents overlapping speech
+- Non-blocking: messages queue instantly, speech plays in order
 
 ## Installation
 
@@ -58,9 +59,41 @@ which say
 - **Enable speech:** Say "turn on speech" or run `touch ~/.claude-speak`
 - **Disable speech:** Say "turn off speech" or run `rm ~/.claude-speak`
 
+## Architecture
+
+The plugin uses a file-based queue system to ensure messages are spoken in order without overlap:
+
+```
+Hook fires -> speak_response.sh (producer) -> writes to ~/.claude-speech/queue/
+                                                      |
+                                           speech_consumer.sh (consumer)
+                                           - holds lockf exclusive lock
+                                           - processes queue in FIFO order
+                                           - runs `say` (blocking) for each message
+                                           - exits after 30s idle
+```
+
+### Queue Structure
+
+```
+~/.claude-speech/
+  queue/
+    0001_1706700000.msg   # NNNN_timestamp.msg format
+    0002_1706700001.msg
+    ...
+  consumer.lock           # lockf exclusive lock
+  consumer.pid            # Running consumer PID
+```
+
+### Edge Cases
+
+- **Consumer crash**: Lock released automatically; next message spawns new consumer
+- **Speech disabled mid-queue**: Consumer checks flag each iteration, exits cleanly
+- **Stale processing files**: Consumer cleans files older than 5 minutes on startup
+
 ## Requirements
 
-- macOS (uses `say` command)
+- macOS (uses `say` command and `lockf` for synchronization)
 - `jq` installed (`brew install jq`)
 
 ## License
