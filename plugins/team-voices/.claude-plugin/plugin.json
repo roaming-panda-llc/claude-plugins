@@ -1,0 +1,14 @@
+{
+  "name": "team-voices",
+  "version": "1.0.0",
+  "description": "ElevenLabs voices for team collaboration - each agent gets a distinct voice",
+  "author": { "name": "Mark Ng" },
+  "license": "MIT",
+  "skills": ["./skills/"],
+  "mcpServers": {
+    "team-voices": {
+      "command": "node",
+      "args": ["${PLUGIN_DIR}/server/index.mjs"]
+    }
+  }
+}
