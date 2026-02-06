@@ -6,17 +6,18 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 
-let client, server, tmpDir, ttsCalls;
+let client, server, tmpDir, ttsCalls, instance;
 
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tv-test-'));
   ttsCalls = [];
 
-  ({ server } = createTeamVoicesServer({
+  instance = createTeamVoicesServer({
     generateTTS: async (text, voiceId, outputPath) => { ttsCalls.push({ text, voiceId, outputPath }); },
     execAsync: async () => {},
     stateDir: tmpDir,
-  }));
+  });
+  server = instance.server;
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   client = new Client({ name: 'test', version: '1.0.0' }, {});
@@ -31,6 +32,7 @@ afterEach(async () => {
   // Let fire-and-forget saveConfig calls settle before closing
   await new Promise(r => setTimeout(r, 50));
   await client.close();
+  instance.cleanup();
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 

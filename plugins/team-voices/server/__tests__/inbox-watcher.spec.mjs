@@ -57,6 +57,7 @@ describe('inbox watcher', () => {
   });
 
   afterEach(async () => {
+    instance.cleanup();
     // Close all mock watchers
     for (const w of watcherInstances) {
       w.close();

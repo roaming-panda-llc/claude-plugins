@@ -6,21 +6,23 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 
-let tmpDir, ttsCalls, execCalls, unlinkCalls;
+let tmpDir, ttsCalls, execCalls, unlinkCalls, instances;
 
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tv-test-'));
   ttsCalls = [];
   execCalls = [];
   unlinkCalls = [];
+  instances = [];
 });
 
 afterEach(async () => {
+  for (const inst of instances) inst.cleanup();
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
 function createServer(overrides = {}) {
-  return createTeamVoicesServer({
+  const inst = createTeamVoicesServer({
     generateTTS: async (text, voiceId, outputPath) => {
       ttsCalls.push({ text, voiceId, outputPath });
     },
@@ -40,6 +42,8 @@ function createServer(overrides = {}) {
     stateDir: tmpDir,
     ...overrides,
   });
+  instances.push(inst);
+  return inst;
 }
 
 async function connectClient(server) {

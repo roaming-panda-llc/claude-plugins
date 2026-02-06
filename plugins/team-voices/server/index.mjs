@@ -5,7 +5,7 @@ const { server, loadConfig, startInboxWatcher } = createTeamVoicesServer();
 
 async function main() {
   await loadConfig();
-  startInboxWatcher();
+  await startInboxWatcher();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

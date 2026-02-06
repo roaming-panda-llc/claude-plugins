@@ -1,7 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { ElevenLabsClient } from 'elevenlabs';
-import { createWriteStream, watch as defaultFsWatch } from 'fs';
+import { createWriteStream, unlinkSync, watch as defaultFsWatch } from 'fs';
 import { pipeline } from 'stream/promises';
 import defaultFs from 'fs/promises';
 import path from 'path';
@@ -9,6 +9,7 @@ import os from 'os';
 import crypto from 'crypto';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import net from 'net';
 
 const defaultExecAsync = promisify(exec);
 
@@ -148,11 +149,122 @@ export function createTeamVoicesServer(deps = {}) {
   const watchers = new Map();
   const debounceTimers = new Map();
   let teamsWatcher = null;
+  let role = 'leader';  // 'leader' | 'follower'
+  let socketServer = null;
+  let socketClient = null;
+  const socketPath = path.join(stateDir, 'playback.sock');
+
+  // --- UDS Socket Functions ---
+
+  function handleClientConnection(conn) {
+    let buffer = '';
+    conn.on('data', (chunk) => {
+      buffer += chunk.toString();
+      let idx;
+      while ((idx = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 1);
+        try {
+          const item = JSON.parse(line);
+          if (queue.length >= 10) queue.splice(0, queue.length - 5);
+          queue.push(item);
+          drain();
+        } catch {}
+      }
+    });
+  }
+
+  async function setupRole() {
+    await fs.mkdir(stateDir, { recursive: true });
+
+    // Try to become leader (bind socket)
+    try {
+      await new Promise((resolve, reject) => {
+        socketServer = net.createServer(handleClientConnection);
+        socketServer.on('error', reject);
+        socketServer.listen(socketPath, resolve);
+      });
+      role = 'leader';
+      return;
+    } catch (err) {
+      socketServer = null;
+      if (err.code !== 'EADDRINUSE') throw err;
+    }
+
+    // Socket exists — try to connect as follower
+    try {
+      socketClient = await new Promise((resolve, reject) => {
+        const client = net.createConnection(socketPath, () => resolve(client));
+        client.on('error', reject);
+      });
+      role = 'follower';
+      setupFollowerReconnect();
+      return;
+    } catch (err) {
+      if (err.code !== 'ECONNREFUSED' && err.code !== 'ENOENT' && err.code !== 'ENOTSOCK') throw err;
+    }
+
+    // Stale socket (no live server) — remove and try to become leader
+    await fs.unlink(socketPath).catch(() => {});
+    try {
+      await new Promise((resolve, reject) => {
+        socketServer = net.createServer(handleClientConnection);
+        socketServer.on('error', reject);
+        socketServer.listen(socketPath, resolve);
+      });
+      role = 'leader';
+      return;
+    } catch (err) {
+      socketServer = null;
+      if (err.code !== 'EADDRINUSE') throw err;
+    }
+
+    // Another process won the race — connect as follower
+    socketClient = await new Promise((resolve, reject) => {
+      const client = net.createConnection(socketPath, () => resolve(client));
+      client.on('error', reject);
+    });
+    role = 'follower';
+    setupFollowerReconnect();
+  }
+
+  function setupFollowerReconnect() {
+    socketClient.on('close', async () => {
+      socketClient = null;
+      try {
+        await setupRole();
+        if (role === 'leader') {
+          doStartInboxWatcher();
+        }
+      } catch (err) {
+        log(`Role setup error after leader disconnect: ${err.message}`);
+      }
+    });
+  }
+
+  function cleanup() {
+    if (socketServer) {
+      socketServer.close();
+      try { unlinkSync(socketPath); } catch {}
+      socketServer = null;
+    }
+    if (socketClient) {
+      socketClient.destroy();
+      socketClient = null;
+    }
+    process.removeListener('exit', exitHandler);
+  }
+  function exitHandler() { cleanup(); }
+  process.on('exit', exitHandler);
 
   // --- Audio Queue ---
 
   function enqueue(item) {
     if (muted && !item.bypassMute) return;
+    if (role === 'follower' && socketClient) {
+      socketClient.write(JSON.stringify(item) + '\n');
+      return;
+    }
     if (queue.length >= 10) queue.splice(0, queue.length - 5);
     queue.push(item);
     drain();
@@ -314,7 +426,7 @@ export function createTeamVoicesServer(deps = {}) {
     }
   }
 
-  async function startInboxWatcher() {
+  async function doStartInboxWatcher() {
     try {
       await fs.mkdir(teamsDir, { recursive: true });
       const entries = await fs.readdir(teamsDir, { withFileTypes: true });
@@ -346,6 +458,13 @@ export function createTeamVoicesServer(deps = {}) {
       log('Inbox watcher started');
     } catch (err) {
       log(`Failed to start inbox watcher: ${err.message}`);
+    }
+  }
+
+  async function startInboxWatcher() {
+    await setupRole();
+    if (role === 'leader') {
+      doStartInboxWatcher();
     }
   }
 
@@ -493,5 +612,6 @@ export function createTeamVoicesServer(deps = {}) {
     saveConfig,
     startInboxWatcher,
     getState,
+    cleanup,
   };
 }

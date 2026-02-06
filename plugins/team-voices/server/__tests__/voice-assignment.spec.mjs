@@ -5,22 +5,27 @@ import os from 'os';
 import path from 'path';
 
 let tmpDir;
+let instances;
 
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tv-test-'));
+  instances = [];
 });
 
 afterEach(async () => {
+  for (const inst of instances) inst.cleanup();
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
 function makeServer(overrides = {}) {
-  return createTeamVoicesServer({
+  const inst = createTeamVoicesServer({
     generateTTS: async () => {},
     execAsync: async () => {},
     stateDir: tmpDir,
     ...overrides,
   });
+  instances.push(inst);
+  return inst;
 }
 
 describe('voice assignment', () => {
